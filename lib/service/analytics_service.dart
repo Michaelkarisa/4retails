@@ -64,7 +64,7 @@ class AnalyticsService {
     }
 
     final totalRevenue = sales.fold<double>(0.0, (sum, sale) => sum + sale.total);
-    final itemsSold = sales.fold<int>(0, (sum, sale) => sum + sale.quantity);
+    final itemsSold = sales.fold<double>(0, (sum, sale) => sum + sale.quantity);
 
     // Find top product
     final productSales = <String, double>{};
@@ -285,8 +285,7 @@ class AnalyticsService {
     // Count sales by product
     for (final sale in sales) {
       final productId = sale.product.id;
-      salesByProduct[productId] =
-          (salesByProduct[productId] ?? 0) + sale.quantity;
+      salesByProduct[productId] = (salesByProduct[productId] ?? 0) + sale.quantity.toInt();
     }
 
     // Calculate turnover rate

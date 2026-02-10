@@ -6,7 +6,7 @@ class LoanEntry {
   final String id;
 
   @HiveField(1)
-  final String saleId;
+  final List<String> saleIds;
 
   @HiveField(2)
   final DateTime date;
@@ -21,30 +21,27 @@ class LoanEntry {
   final double totalAmount;
 
   @HiveField(6)
-  final double amountPaid;
-
-  @HiveField(7)
   final bool isPaid;
 
-  @HiveField(8)
+  @HiveField(7)
   final DateTime? paidDate;
 
-  @HiveField(9)
+  @HiveField(8)
   final List<Payment> payments;
 
   LoanEntry({
     required this.id,
-    required this.saleId,
+    required this.saleIds,
     required this.date,
     required this.name,
     required this.phone,
     required this.totalAmount,
-    this.amountPaid = 0.0,
     this.isPaid = false,
     this.paidDate,
     this.payments = const [],
   });
 
+  double get amountPaid => payments.fold<double>(0.0, (sum, loan) => sum + loan.amount);
   double get balance => totalAmount - amountPaid;
 
   double get percentagePaid => totalAmount > 0 ? (amountPaid / totalAmount) * 100 : 0.0;
@@ -63,12 +60,11 @@ class LoanEntry {
   }) {
     return LoanEntry(
       id: id ?? this.id,
-      saleId: saleId ?? this.saleId,
+      saleIds: saleIds ?? this.saleIds,
       date: date ?? this.date,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       totalAmount: totalAmount ?? this.totalAmount,
-      amountPaid: amountPaid ?? this.amountPaid,
       isPaid: isPaid ?? this.isPaid,
       paidDate: paidDate ?? this.paidDate,
       payments: payments ?? this.payments,

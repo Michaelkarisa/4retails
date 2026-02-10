@@ -20,9 +20,17 @@ class _AddSaleFormState extends State<AddSaleForm> {
   String? _name;
   String? _phone;
   String _primaryUnit = 'Box';
-  String _secondaryUnit = 'Piece';
+ // String _secondaryUnit = 'Piece';
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  //String _secondaryUnit = 'Piece';
+  String _secondaryUnit1 = 'Piece';
+  final _quantityController1 = TextEditingController();
+  final _quantityController2 = TextEditingController();
+  final _buyingPriceController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
+  final _itemController = TextEditingController();
+  Map<String,dynamic> unitPrice ={};
   final double _previousPrice = 120.0;
 
   final List<String> _primaryUnits = ['Box', 'Can', 'Carton', 'Bag','Piece', 'Kg', 'Litre'];
@@ -39,15 +47,7 @@ class _AddSaleFormState extends State<AddSaleForm> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: 'Product Name',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (value) => _productName = value,
-              validator: (value) => value?.isEmpty == true ? 'Required' : null,
-            ),
+            _productSearch(),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -81,18 +81,6 @@ class _AddSaleFormState extends State<AddSaleForm> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _priceController,
-              decoration: const InputDecoration(
-                labelText: 'Selling Price (KES)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.attach_money),
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) => value?.isEmpty == true ? 'Required' : null,
-              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
             Row(
@@ -195,10 +183,10 @@ Widget _loan(){
     try {
       if (_formKey.currentState!.validate()) {
         final productName = _productName!.trim();
-        final quantity = int.parse(_quantityController.text);
-        final priceperitem = int.parse(_priceController.text);
+        final quantity = double.parse(_quantityController.text);
+        final pricePerItem = int.parse(_priceController.text);
         // Save product if new (or reuse existing)
-        final product = await _findOrCreateProduct(productName);
+        final product = await DataService().findOrCreateProduct(productName);
         final saleId = const Uuid().v4();
         final saleEntry = SaleEntry(
           id: saleId,
@@ -206,21 +194,24 @@ Widget _loan(){
           date: DateTime.now(),
           quantity: quantity,
           primaryUnit: _primaryUnit,
-          secondaryUnit: _secondaryUnit,
-          pricePerItem: priceperitem.toDouble(),
+          pricePerItem: pricePerItem.toDouble(),
           paid: !loan,
         );
 
         // Save to Hive
         await DataService().addSale(saleEntry);
         if (loan) {
-          await DataService().addLoan(
-              LoanEntry(id: const Uuid().v4(),
-                  saleId: saleId,
-                  date: DateTime.now(),
+          final loanEntry = await DataService().findOrCreateLoan(_phone!,_name!);
+           loanEntry.saleIds.add(saleId);
+          await DataService().updateLoan(
+              LoanEntry(id: loanEntry.id,
+                  saleIds: loanEntry.saleIds,
+                  date: loanEntry.date,
                   name: _name!,
                   phone: _phone!,
-                  totalAmount: 0));
+                  totalAmount: loanEntry.totalAmount,
+                  payments: loanEntry.payments,
+              ));
         }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -241,24 +232,168 @@ Widget _loan(){
     }
   }
 
-  Future<Product> _findOrCreateProduct(String name) async {
-    final productsBox = Hive.box<Product>('products');
-
-    try {
-      final existing = productsBox.values.firstWhere(
-            (p) => p.name.toLowerCase() == name.toLowerCase(),
-      );
-      return existing;
-    } catch (_) {
-      // Not found → create new
-      final newProduct = Product(
-        id: const Uuid().v4(),
-        name: name,
-      );
-      await productsBox.put(newProduct.id, newProduct);
-      return newProduct;
-    }
+  Widget _productSearch(){
+    List<Product> products =[];
+    return Column(
+      children: [
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Product Name',
+            hintText: 'e.g., Maize Flour, Cooking Oil',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.inventory),
+            suffixIcon: _productName != null && _productName!.isNotEmpty
+                ? IconButton(
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                setState(() {
+                  _productName = null;
+                });
+              },
+            )
+                : null,
+          ),
+          onChanged: (value){
+            _productName = value.trim();
+            setState(() {
+              products = DataService().findProducts(value);
+            });
+          },
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Product name is required';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        AnimatedContainer(duration: Duration(milliseconds: 300),
+          child: products.isNotEmpty?Column(
+            children: products.map((product)=>Container(
+              margin: EdgeInsets.symmetric(horizontal: 5,vertical: 5),
+              child: Text(product.name),
+            )).toList(),
+          ):_productName != null && _productName!.isNotEmpty?Column(
+            children: [
+              Text(
+                'Add new product',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _quantityController2,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Required';
+                        final qty = int.tryParse(value);
+                        if (qty == null || qty <= 0) return 'Enter valid quantity';
+                        return null;
+                      },
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _secondaryUnit1,
+                      decoration: const InputDecoration(
+                        labelText: 'Unit',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _secondaryUnits.map((unit) {
+                        return DropdownMenuItem(value: unit, child: Text(unit));
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _secondaryUnit1 = value!;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _sellingPriceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Price (KES)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.sell),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Required';
+                        final price = double.tryParse(value);
+                        if (price == null || price <= 0) return 'Enter valid price';
+                        return null;
+                      },
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.add_circle),
+                    color: Theme.of(context).colorScheme.primary,
+                    iconSize: 30,
+                    onPressed: (){
+                      unitPrice["${_quantityController2.text}-$_secondaryUnit1"]=double.parse(_sellingPriceController.text);
+                      setState(() {});
+                    },
+                  ),
+                ],
+              ),
+              SizedBox(height: 5,),
+              Column(
+                children: unitPrice.entries.map((unitp){
+                  return Container(
+                    margin: EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      children: [
+                        Text(unitp.key.toString()),
+                        SizedBox(width: 5,),
+                        Text(unitp.value.toString())
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final product = Product(
+                      id: const Uuid().v4(),
+                      name: _productName.toString(),
+                      unitPrice: unitPrice);
+                  await DataService().updateProduct(product);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Product'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              )
+            ],
+          ):SizedBox.shrink(),
+        ),
+      ],
+    );
   }
+
 
   @override
   void dispose() {

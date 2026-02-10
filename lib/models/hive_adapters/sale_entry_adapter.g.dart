@@ -16,12 +16,11 @@ class SaleEntryAdapter extends TypeAdapter<SaleEntry> {
       id: fields[0] as String,
       product: fields[1] as Product,
       date: fields[2] as DateTime,
-      quantity: fields[3] as int,
+      quantity: fields[3] as double,
       primaryUnit: fields[4] as String,
-      secondaryUnit: fields[5] as String,
-      pricePerItem: fields[6] as double,
-      paid: fields[7] as bool,
-      paidDate: fields[8] as DateTime,
+      pricePerItem: fields[5] as double,
+      paid: fields[6] as bool? ?? false,
+      paidDate: fields[7] as DateTime?,
     );
   }
 
@@ -40,8 +39,6 @@ class SaleEntryAdapter extends TypeAdapter<SaleEntry> {
       ..writeByte(4)
       ..write(obj.primaryUnit)
       ..writeByte(5)
-      ..write(obj.secondaryUnit)
-      ..writeByte(6)
       ..write(obj.pricePerItem);
   }
 }

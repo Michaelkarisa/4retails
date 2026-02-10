@@ -1,8 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../models/loan_entry.dart';
 import '../../models/sale_entry.dart';
 import '../../service/data_service.dart';
 import 'lending_card.dart';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:retails/models/sale_entry.dart';
+import 'package:retails/screens/sales/sales_entry_card.dart';
+import 'package:retails/utils/pdf_exporter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 class Lending extends StatefulWidget {
   const Lending({super.key});
@@ -51,12 +61,174 @@ class _LendingState extends State<Lending> with SingleTickerProviderStateMixin {
     }
   }
 
-  void _exportPdf() {
-    // TODO: Implement PDF export for debts
+  Future<void> _exportPdf() async {
+    if (allDebts.isEmpty) {
+      _showSnackBar('No debt data to export', isError: true);
+      return;
+    }
+
+    setState(() {
+      isExportingPdf = true;
+    });
+
+    try {
+      final pdfBytes = await PdfExporter.generateDebtsReport(
+        DateTime.now(),
+        allDebts,
+      );
+
+      // Save PDF internally (no permission required)
+      final filePath = await _savePdf(pdfBytes);
+
+      if (filePath != null) {
+        setState(() {
+          isExportingPdf = false;
+        });
+
+        _showExportSuccessDialog(filePath);
+      } else {
+        setState(() {
+          isExportingPdf = false;
+        });
+        _showSnackBar('Failed to save PDF', isError: true);
+      }
+    } catch (e) {
+      setState(() {
+        isExportingPdf = false;
+      });
+      _showSnackBar('Error exporting PDF: $e', isError: true);
+    }
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      if (await Permission.manageExternalStorage.isPermanentlyDenied ||
+          await Permission.storage.isPermanentlyDenied ||
+          await Permission.photos.isPermanentlyDenied) {
+        await openAppSettings();
+        return false;
+      }
+
+      // Android 13+
+      if (Platform.version.contains('13')) {
+        var status = await Permission.photos.status;
+        if (!status.isGranted) {
+          status = await Permission.photos.request();
+        }
+        return status.isGranted;
+      }
+      // Android 10-12
+      else if (Platform.version.contains('12') || Platform.version.contains('11') || Platform.version.contains('10')) {
+        var status = await Permission.storage.status;
+        if (!status.isGranted) {
+          status = await Permission.storage.request();
+        }
+        return status.isGranted;
+      }
+    }
+
+    return true; // iOS doesn't need extra storage permissions
+  }
+
+// Save PDF internally (safe for all Android/iOS)
+  Future<String?> _savePdf(Uint8List pdfBytes) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'debt_report_$timestamp.pdf';
+      final file = File('${directory.path}/$fileName');
+
+      await file.writeAsBytes(pdfBytes);
+      return file.path;
+    } catch (e) {
+      debugPrint('Error saving PDF: $e');
+      return null;
+    }
+  }
+
+
+  void _showExportSuccessDialog(String filePath) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green[600], size: 28),
+            const SizedBox(width: 12),
+            const Text('PDF Exported'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your debt report has been generated successfully!'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.folder_outlined, size: 20, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      filePath,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              await Share.shareXFiles(
+                [XFile(filePath)],
+                text: 'Debt Report - 4Retails',
+              );
+            },
+            icon: const Icon(Icons.share),
+            label: const Text('Share'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('PDF export coming soon'),
-        backgroundColor: Colors.blue,
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+        action: isError
+            ? SnackBarAction(
+          label: 'Retry',
+          textColor: Colors.white,
+          onPressed: getData,
+        )
+            : null,
       ),
     );
   }
@@ -169,14 +341,15 @@ class _LendingState extends State<Lending> with SingleTickerProviderStateMixin {
     double totalDebt = 0;
     double totalPaid = 0;
     double totalBalance = 0;
-
+    List<SaleEntry> allSales = [];
     for (final entry in allDebts.entries) {
       final loan = entry.key;
-      totalDebt += loan.totalAmount;
+      //totalDebt += loan.totalAmount;
       totalPaid += loan.amountPaid;
       totalBalance += loan.balance;
+      allSales.addAll(entry.value);
     }
-
+     totalDebt = allSales.fold<double>(0.0, (sum, sale) => sum + sale.total);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

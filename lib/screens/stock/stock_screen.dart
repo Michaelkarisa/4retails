@@ -43,7 +43,7 @@ class _StockScreenState extends State<StockScreen> with SingleTickerProviderStat
   bool isLoading = true;
   Future<void> _exportPdf() async {
     if (stockEntries.isEmpty) {
-      _showSnackBar('No sales data to export', isError: true);
+      _showSnackBar('No stock data to export', isError: true);
       return;
     }
 
@@ -274,18 +274,168 @@ class _StockScreenState extends State<StockScreen> with SingleTickerProviderStat
         ],
       ),
 
-      body: RefreshIndicator(
-          onRefresh: ()async{
-            await getData();
-          },
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: stockEntries.length,
-          itemBuilder: (context, index) {
-            return StockEntryCard(entry: stockEntries[index]);
-          },
+      body: _buildBody(),
+    );
+  }
+  Widget _buildBody() {
+    if (isLoading) {
+      return _buildLoadingState();
+    }
+
+    if (errorMessage != null) {
+      return _buildErrorState();
+    }
+
+    if (stockEntries.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildStockList();
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading sales data...',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStockList() {
+    return RefreshIndicator(
+      onRefresh: ()async{
+        await getData();
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: stockEntries.length,
+        itemBuilder: (context, index) {
+          return StockEntryCard(entry: stockEntries[index]);
+        },
+      ),
+    );
+
+  }
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: Colors.red[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Oops! Something went wrong',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage ?? 'Unknown error',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: getData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 80,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No stock yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Start by adding your first stock',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddStockScreen()),
+                );
+
+                if (result == true) {
+                  getData();
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add Stock'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
 }

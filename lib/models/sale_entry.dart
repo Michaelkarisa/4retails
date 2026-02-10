@@ -11,16 +11,14 @@ class SaleEntry {
   @HiveField(2)
   final DateTime date;
   @HiveField(3)
-  final int quantity;
+  final double quantity;
   @HiveField(4)
   final String primaryUnit;
   @HiveField(5)
-  final String secondaryUnit;
-  @HiveField(6)
   final double pricePerItem;
-  @HiveField(7)
+  @HiveField(6)
   final bool paid;
-  @HiveField(8)
+  @HiveField(7)
   final DateTime? paidDate;
   SaleEntry({
     required this.id,
@@ -28,7 +26,6 @@ class SaleEntry {
     required this.date,
     required this.quantity,
     required this.primaryUnit,
-    required this.secondaryUnit,
     required this.pricePerItem,
     required this.paid,
     this.paidDate,

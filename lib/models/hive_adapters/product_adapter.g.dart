@@ -14,6 +14,7 @@ class ProductAdapter extends TypeAdapter<Product> {
     return Product(
       id: fields[0] as String,
       name: fields[1] as String,
+      unitPrice:fields[2] as Map<String, double>? ?? {},
     );
   }
 

@@ -7,6 +7,7 @@ class Product {
   final String id;
   @HiveField(1)
   final String name;
-
-  Product({required this.id, required this.name});
+  @HiveField(2)
+  final Map<String,dynamic> unitPrice;
+  Product({required this.id, required this.name,required this.unitPrice});
 }

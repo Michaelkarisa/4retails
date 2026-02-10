@@ -28,11 +28,9 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
   String? _name;
   String? _phone;
   late String _primaryUnit;
-  late String _secondaryUnit;
   final double _previousPrice = 120.0; // You may want to calculate this dynamically
 
   final List<String> _primaryUnits = ['Box', 'Can', 'Carton', 'Bag','Piece', 'Kg', 'Litre'];
-  final List<String> _secondaryUnits = ['Piece', 'Kg', 'Litre'];
   bool loan = false;
   @override
   void initState() {
@@ -45,7 +43,6 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
     _quantityController = TextEditingController(text: widget.entry.quantity.toString());
     _priceController = TextEditingController(text: widget.entry.pricePerItem.toStringAsFixed(2));
     _primaryUnit = widget.entry.primaryUnit;
-    _secondaryUnit = widget.entry.secondaryUnit;
   }
 
   @override
@@ -133,7 +130,7 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
               const SizedBox(height: 8),
               _buildInfoRow(
                 icon: Icons.sell_outlined,
-                label: 'Price per Item',
+                label: 'Price per ${widget.entry.primaryUnit}',
                 value: 'KES ${widget.entry.pricePerItem.toStringAsFixed(2)}',
                 valueColor: Colors.blue[700],
               ),
@@ -141,7 +138,7 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
               _buildInfoRow(
                 icon: Icons.attach_money,
                 label: 'Unit Type',
-                value: '${widget.entry.primaryUnit} (${widget.entry.secondaryUnit})',
+                value: '${widget.entry.primaryUnit}',
                 valueColor: Colors.grey[700],
               ),
               const SizedBox(height: 12),
@@ -327,25 +324,6 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
             const SizedBox(height: 16),
 
             // Secondary Unit
-            DropdownButtonFormField<String>(
-              value: _secondaryUnit,
-              decoration: InputDecoration(
-                labelText: 'Secondary Unit',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: Colors.grey[50],
-              ),
-              items: _secondaryUnits.map((unit) {
-                return DropdownMenuItem(value: unit, child: Text(unit));
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _secondaryUnit = value!;
-                });
-              },
-            ),
             const SizedBox(height: 16),
 
             // Selling Price
@@ -664,20 +642,25 @@ class _SalesEntryCardState extends State<SalesEntryCard> {
           id: widget.entry.id,
           product: widget.entry.product,
           date: widget.entry.date,
-          quantity: int.parse(_quantityController.text),
+          quantity: double.parse(_quantityController.text),
           primaryUnit: _primaryUnit,
-          secondaryUnit: _secondaryUnit,
           pricePerItem: double.parse(_priceController.text),
           paid: widget.entry.paid,
         ),
       );
 
-      if(loan){
-        await DataService().addLoan(
-            LoanEntry(id: const Uuid().v4(),
-                saleId: widget.entry.id,
-                date: DateTime.now(),
-                name: _name!, phone: _phone!, totalAmount: 0));
+      if (loan) {
+        final loanEntry = await DataService().findOrCreateLoan(_phone!,_name!);
+        loanEntry.saleIds.add(widget.entry.id);
+        await DataService().updateLoan(
+            LoanEntry(id: loanEntry.id,
+              saleIds: loanEntry.saleIds,
+              date: loanEntry.date,
+              name: _name!,
+              phone: _phone!,
+              totalAmount: loanEntry.totalAmount,
+              payments: loanEntry.payments,
+            ));
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

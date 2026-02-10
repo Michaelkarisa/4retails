@@ -25,6 +25,26 @@ class _LoanEntryCardState extends State<LoanEntryCard> {
   final _paymentController = TextEditingController();
 
   @override
+  void initState(){
+    super.initState();
+   // handlePaid();
+  }
+
+  void handlePaid()async{
+    final totalSales = widget.sales.fold<double>(0.0, (sum, sale) => sum + sale.total);
+    final percentagePaid = (widget.loanEntry.amountPaid/totalSales)*100;
+
+    if(percentagePaid>=100) {
+      final updatedLoan = widget.loanEntry.copyWith(
+        amountPaid: widget.loanEntry.totalAmount,
+        payments: widget.loanEntry.payments,
+        isPaid: true,
+        paidDate: DateTime.now(),
+      );
+      await DataService().updateLoan(updatedLoan);
+    }
+  }
+  @override
   void dispose() {
     _paymentController.dispose();
     super.dispose();
@@ -34,8 +54,8 @@ class _LoanEntryCardState extends State<LoanEntryCard> {
   Widget build(BuildContext context) {
     final dateStr = formatDateForDisplay(widget.loanEntry.date);
     final totalSales = widget.sales.fold<double>(0.0, (sum, sale) => sum + sale.total);
-    final balance = widget.loanEntry.balance;
-    final percentagePaid = widget.loanEntry.percentagePaid;
+    final balance = totalSales-widget.loanEntry.amountPaid;
+    final percentagePaid = (widget.loanEntry.amountPaid/totalSales)*100;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -339,7 +359,7 @@ class _LoanEntryCardState extends State<LoanEntryCard> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${sale.quantity} ${sale.secondaryUnit}${sale.quantity > 1 ? 's' : ''} @ KES ${sale.pricePerItem.toStringAsFixed(2)}',
+                  '${sale.quantity} ${sale.primaryUnit}${sale.quantity > 1 ? 's' : ''} @ KES ${sale.pricePerItem.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -570,7 +590,7 @@ class _LoanEntryCardState extends State<LoanEntryCard> {
 
     final updatedPayments = [...widget.loanEntry.payments, newPayment];
     final newAmountPaid = widget.loanEntry.amountPaid + amount;
-    final isPaid = newAmountPaid >= widget.loanEntry.totalAmount;
+    final isPaid = newAmountPaid >= widget.sales.fold<double>(0.0, (sum, sale) => sum + sale.total);
 
     final updatedLoan = widget.loanEntry.copyWith(
       amountPaid: newAmountPaid,

@@ -21,7 +21,7 @@ class TodaysSalesTab extends StatelessWidget {
     final totalSales = sales.fold<double>(0, (sum, sale) => sum + sale.total);
     final previousDayTotal = 8500.0; // In a real app, fetch from DB
     final difference = totalSales - previousDayTotal;
-    final itemsSold = sales.fold<int>(0, (sum, sale) => sum + sale.quantity);
+    final itemsSold = sales.fold<double>(0, (sum, sale) => sum + sale.quantity);
 
     return Column(
       children: [
@@ -37,7 +37,7 @@ class TodaysSalesTab extends StatelessWidget {
                 : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildSummaryCards(totalSales, difference, itemsSold),
+                _buildSummaryCards(totalSales, difference, itemsSold.toInt()),
                 const SizedBox(height: 20),
                 _buildSalesHeader(sales.length),
                 const SizedBox(height: 12),
@@ -180,7 +180,7 @@ class TodaysSalesTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
@@ -193,7 +193,7 @@ class TodaysSalesTab extends StatelessWidget {
                         size: 18,
                         color: Colors.white70,
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 3.5),
                       Text(
                         'vs Yesterday: ',
                         style: TextStyle(
@@ -209,7 +209,7 @@ class TodaysSalesTab extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3.5),
                       Text(
                         '(${isPositive ? '+' : '-'}${percentageChange.toStringAsFixed(1)}%)',
                         style: TextStyle(
@@ -217,7 +217,7 @@ class TodaysSalesTab extends StatelessWidget {
                           fontSize: 12,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3.5),
                       Icon(
                         isPositive ? Icons.trending_up : Icons.trending_down,
                         color: isPositive ? Colors.greenAccent[400] : Colors.redAccent[200],
@@ -396,7 +396,7 @@ class TodaysSalesTab extends StatelessWidget {
               children: [
                 _buildInfoChip(
                   icon: Icons.inventory_2_outlined,
-                  text: '${sale.quantity} ${sale.secondaryUnit}${sale.quantity > 1 ? 's' : ''}',
+                  text: '${sale.quantity} ${sale.primaryUnit}${sale.quantity > 1 ? 's' : ''}',
                   color: Colors.blue,
                 ),
                 const SizedBox(width: 8),

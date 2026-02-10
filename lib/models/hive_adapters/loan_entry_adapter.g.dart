@@ -13,12 +13,11 @@ class LoanEntryAdapter extends TypeAdapter<LoanEntry> {
     };
     return LoanEntry(
       id: fields[0] as String,
-      saleId: fields[1] as String,
+      saleIds: fields[1] as List<String>,
       date: fields[2] as DateTime,
       name: fields[3] as String,
       phone: fields[4] as String,
       totalAmount: fields[5] as double? ?? 0.0,
-      amountPaid: fields[6] as double? ?? 0.0,
       isPaid: fields[7] as bool? ?? false,
       paidDate: fields[8] as DateTime?,
       payments: (fields[9] as List?)?.cast<Payment>() ?? [],
@@ -32,7 +31,7 @@ class LoanEntryAdapter extends TypeAdapter<LoanEntry> {
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.saleId)
+      ..write(obj.saleIds)
       ..writeByte(2)
       ..write(obj.date)
       ..writeByte(3)

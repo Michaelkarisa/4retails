@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:retails/screens/home/products_screen.dart';
+import 'package:retails/utils/trypage.dart';
 import 'tabs/todays_sales_tab.dart';
 import 'tabs/current_stock_tab.dart';
 
@@ -25,6 +27,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         title: const Text('4Retails', style: TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
+        actions: [
+          IconButton(onPressed: (){
+            Navigator.push(context, MaterialPageRoute(builder: (context)=>ProductsScreen()));
+          }, icon: Icon(Icons.arrow_forward))
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

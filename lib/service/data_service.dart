@@ -1,6 +1,8 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:retails/models/loan_entry.dart';
+import 'package:retails/models/stock_removal.dart';
 import 'package:uuid/uuid.dart';
+import '../models/product.dart';
 import '../models/sale_entry.dart';
 import '../models/stock_entry.dart';
 import '../models/resolution.dart';
@@ -14,6 +16,8 @@ class DataService {
   final _stockBox = Hive.box<StockEntry>('stock');
   final _resolutionsBox = Hive.box<Resolution>('resolutions');
   final _loanBox = Hive.box<LoanEntry>('loans');
+  final _productBox = Hive.box<Product>('products');
+  final _stockRemovalBox = Hive.box<StockRemoval>('stock_removals');
   bool isNet = false;
 
   // ==================== SALES ====================
@@ -139,7 +143,7 @@ class DataService {
     List<LoanEntry> allLoans = _loanBox.values.toList();
 
     for (var loan in allLoans) {
-      final sales = allSales.where((sale) => sale.id == loan.saleId).toList();
+      final sales = allSales.where((sale) => loan.saleIds.contains(sale.id)).toList();
       allDebts[loan] = sales;
     }
 
@@ -245,14 +249,12 @@ class DataService {
 
   /// Get total debt amount across all loans
   Future<double> getTotalDebtAmount() async {
-    return _loanBox.values
-        .fold<double>(0.0, (sum, loan) => sum + loan.totalAmount);
+    return _loanBox.values.fold<double>(0.0, (sum, loan) => sum + loan.totalAmount);
   }
 
   /// Get total amount paid across all loans
   Future<double> getTotalAmountPaid() async {
-    return _loanBox.values
-        .fold<double>(0.0, (sum, loan) => sum + loan.amountPaid);
+    return _loanBox.values.fold<double>(0.0, (sum, loan) => sum + loan.amountPaid);
   }
 
   /// Get loans for a specific customer (by name or phone)
@@ -290,6 +292,151 @@ class DataService {
       'totalPaid': totalPaid,
       'totalBalance': totalBalance,
       'collectionRate': totalDebt > 0 ? (totalPaid / totalDebt) * 100 : 0.0,
+    };
+  }
+
+  /// Find or create loan by phone number
+  Future<LoanEntry> findOrCreateLoan(String phone, String name) async {
+    try {
+      final existing = _loanBox.values.firstWhere(
+            (l) => l.phone.toLowerCase() == phone.toLowerCase(),
+      );
+      return existing;
+    } catch (_) {
+      // Not found → create new
+      final newLoan = LoanEntry(
+        id: const Uuid().v4(),
+        name: name,
+        saleIds: [],
+        date: DateTime.now(),
+        phone: phone,
+        totalAmount: 0.0,
+      );
+      await _loanBox.put(newLoan.id, newLoan);
+      return newLoan;
+    }
+  }
+
+  // ==================== PRODUCTS ====================
+
+  /// Find or create product by name
+  Future<Product> findOrCreateProduct(String name) async {
+    try {
+      final existing = _productBox.values.firstWhere(
+            (p) => p.name.toLowerCase() == name.toLowerCase(),
+      );
+      return existing;
+    } catch (_) {
+      // Not found → create new
+      final newProduct = Product(
+        id: const Uuid().v4(),
+        name: name,
+        unitPrice: {},
+      );
+      await _productBox.put(newProduct.id, newProduct);
+      return newProduct;
+    }
+  }
+
+  List<Product> findProducts(String name){
+      final results = _productBox.values.where(
+            (p) => p.name.toLowerCase().startsWith(name.toLowerCase()),
+      ).toList();
+      return results.length > 5 ? results.sublist(0, 5) : results;
+  }
+  /// Get products matching search term (limited to 5 results)
+  List<Product> getProducts(String name) {
+    final results = _productBox.values
+        .where((p) => p.name.toLowerCase().contains(name.toLowerCase()))
+        .toList();
+    return results.length > 5 ? results.sublist(0, 5) : results;
+  }
+
+  /// Get all products
+  List<Product> getAllProducts() {
+    return _productBox.values.toList();
+  }
+
+  /// Update product
+  Future<void> updateProduct(Product product) async {
+    await _productBox.put(product.id, product);
+  }
+
+  /// Update product price tier
+  Future<void> updateProductPrice(
+      String productId,
+      double quantity,
+      String unit,
+      double price,
+      ) async {
+    final product = _productBox.get(productId);
+    if (product != null) {
+      final updatedPrices = Map<String, dynamic>.from(product.unitPrice);
+      updatedPrices['$quantity-$unit'] = price;
+      final updatedProduct = Product(
+        id: product.id,
+        name: product.name,
+        unitPrice: updatedPrices,
+      );
+      await _productBox.put(productId, updatedProduct);
+    }
+  }
+
+  // ==================== STOCK REMOVAL ====================
+
+  /// Add a stock removal record
+  Future<void> addStockRemoval(StockRemoval removal) async {
+    await _stockRemovalBox.put(removal.id, removal);
+  }
+
+  /// Get all stock removal records
+  Future<List<StockRemoval>> getAllStockRemovals() async {
+    return _stockRemovalBox.values.toList()
+      ..sort((a, b) => b.removedDate.compareTo(a.removedDate));
+  }
+
+  /// Get stock removals by reason
+  Future<List<StockRemoval>> getStockRemovalsByReason(RemovalReason reason) async {
+    return _stockRemovalBox.values
+        .where((removal) => removal.reason == reason)
+        .toList()
+      ..sort((a, b) => b.removedDate.compareTo(a.removedDate));
+  }
+
+  /// Get stock removals for a date range
+  Future<List<StockRemoval>> getStockRemovalsByDateRange(
+      DateTime startDate,
+      DateTime endDate,
+      ) async {
+    return _stockRemovalBox.values
+        .where((removal) =>
+    removal.removedDate.isAfter(startDate) &&
+        removal.removedDate.isBefore(endDate))
+        .toList()
+      ..sort((a, b) => b.removedDate.compareTo(a.removedDate));
+  }
+
+  /// Get stock removal statistics
+  Future<Map<String, dynamic>> getStockRemovalStatistics() async {
+    final allRemovals = _stockRemovalBox.values.toList();
+
+    final totalQuantity = allRemovals.fold<int>(
+      0,
+          (sum, removal) => sum + removal.quantity,
+    );
+
+    final byReason = <RemovalReason, int>{};
+    for (final removal in allRemovals) {
+      byReason[removal.reason] = (byReason[removal.reason] ?? 0) + removal.quantity;
+    }
+
+    return {
+      'totalRemovals': allRemovals.length,
+      'totalQuantity': totalQuantity,
+      'byReason': byReason,
+      'damagedCount': byReason[RemovalReason.damaged] ?? 0,
+      'expiredCount': byReason[RemovalReason.expired] ?? 0,
+      'retailStockingCount': byReason[RemovalReason.retailStocking] ?? 0,
     };
   }
 }
